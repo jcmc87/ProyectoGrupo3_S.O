@@ -126,7 +126,7 @@ class SimulatedDisk {
     }
 
     //Comprobando la rama que acabo de crear y validnado que si funcione 
-
+    //Explicacion de video .
     // ----------------------------------------------------------
     // freeBlocks(blockList)
     // Libera los bloques indicados: los marca como 0 en el bitmap
