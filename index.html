@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ubuntu EXT-SIM</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Panel superior -->
+    <div id="top-panel">
+        <div class="panel-left">Actividades</div>
+        <div class="panel-center" id="clock">12:00</div>
+        <div class="panel-right" id="disk-status">Disco: Sin formato</div>
+    </div>
+
+    <!-- Área de trabajo -->
+    <div id="workspace">
+        <!-- Dock lateral izquierdo -->
+        <div id="dock">
+            <!-- Botón del Menú Principal -->
+            <div class="dock-item" onclick="app.toggleMainMenu()" title="Menú Principal" style="margin-bottom: 20px; background: rgba(233, 84, 32, 0.8);">Ubuntu</div>
+            
+            <div class="dock-item" onclick="app.openApp('files')" title="Archivos">📁</div>
+            <div class="dock-item" onclick="app.openApp('config')" title="Configuración">⚙️</div>
+            <div class="dock-item" onclick="app.openApp('info')" title="Info Disco">💽</div>
+            <div class="dock-item" onclick="app.openApp('terminal')" title="Terminal">🖥️</div>
+        </div>
+
+        <!-- Escritorio principal -->
+        <div id="desktop-area">
+            <!-- Menú Principal (Oculto por defecto) -->
+            <div id="main-menu" class="hidden">
+                <div class="menu-header">Menú Principal</div>
+                <div class="menu-body">
+                    <!-- Categoría: Configuración OS -->
+                    <div class="menu-item" onclick="app.openApp('info'); app.toggleMainMenu()">
+                        <div class="menu-icon">🖥️</div>
+                        <div class="menu-text">
+                            <strong>Configuración OS</strong>
+                            <span>Capacidades físicas y distribución lógica (Info Disco)</span>
+                        </div>
+                    </div>
+                    <!-- Categoría: Configuración Disco Local -->
+                    <div class="menu-item" onclick="app.openApp('config'); app.toggleMainMenu()">
+                        <div class="menu-icon">⚙️</div>
+                        <div class="menu-text">
+                            <strong>Configuración Disco Local</strong>
+                            <span>Algoritmo, almacenamiento y estructura (Formateo)</span>
+                        </div>
+                    </div>
+                    <!-- Categoría: Operación con archivos -->
+                    <div class="menu-item" onclick="app.openApp('files'); app.toggleMainMenu()">
+                        <div class="menu-icon">📁</div>
+                        <div class="menu-text">
+                            <strong>Operación con archivos</strong>
+                            <span>Crear, Guardar, Eliminar, Mover</span>
+                        </div>
+                    </div>
+                    <!-- Categoría: Salir -->
+                    <div class="menu-item exit-item" onclick="app.exitSystem()">
+                        <div class="menu-icon">🛑</div>
+                        <div class="menu-text">
+                            <strong>Salir</strong>
+                            <span>Cerrar el sistema simulado</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Iconos de archivos en el escritorio (raíz) -->
+            <div id="desktop-icons"></div>
+            
+            <!-- Contenedor de ventanas (se agregan dinámicamente) -->
+            <div id="windows-container"></div>
+        </div>
+    </div>
+
+    <!-- Modal para mensajes / formularios -->
+    <div id="modal-bg" class="hidden">
+        <div id="modal-box">
+            <h3 id="modal-title"></h3>
+            <div id="modal-body"></div>
+            <div id="modal-foot"></div>
+        </div>
+    </div>
+
+    <!-- Contenedor de notificaciones -->
+    <div id="toasts"></div>
+
+    <script src="js/disk.js"></script>
+    <script src="js/fs.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
