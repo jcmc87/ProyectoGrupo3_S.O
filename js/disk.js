@@ -125,6 +125,8 @@ class SimulatedDisk {
         return allocated;
     }
 
+    //Comprobando la rama que acabo de crear y validnado que si funcione 
+
     // ----------------------------------------------------------
     // freeBlocks(blockList)
     // Libera los bloques indicados: los marca como 0 en el bitmap
