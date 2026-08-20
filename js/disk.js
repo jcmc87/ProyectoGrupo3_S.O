@@ -1,57 +1,42 @@
-/**
- * ============================================================
- * disk.js — Motor del Disco Simulado tipo EXT
- * ============================================================
- * Universidad Tecnológica Centroamericana (UNITEC-CEUTEC)
- * Sistemas Operativos I | Sección 74 | Proyecto Grupal
- *
- * Este módulo simula el hardware de almacenamiento:
- *  - Disco: array de N bloques físicos de tamaño fijo
- *  - Superbloque: metadatos globales del sistema de archivos
- *  - Bitmap: registro de bloques libres (0) y ocupados (1)
- *  - Tabla de inodos: índices con apuntadores a bloques físicos
- * ============================================================
- */
-
 'use strict';
 
-// ============================================================
-// CLASE PRINCIPAL: Disco Simulado
-// ============================================================
+
+/*  ------------------ Disco Simulado -----------------------------------  */
+//Creando la estructura principal del disco
 class SimulatedDisk {
     constructor() {
-        this.initialized = false;
-        this.superblock   = null;  // Metadatos del FS
-        this.blockBitmap  = [];    // 0=libre, 1=ocupado
+        this.initialized = false;  //Verificamos si el disco ya fue incializado
+        this.superblock   = null;  // Guarda la metadata del file system
+        this.blockBitmap  = [];    // Que bloques estan libres y ocupados: 0=libre, 1=ocupado
         this.blocks       = [];    // Array de bloques físicos
-        this.inodeTable   = [];    // Tabla de inodos
-        this.nextInodeId  = 0;     // Contador monotónico de inodos
+        this.inodeTable   = [];    // Tabla para guardar los inodos
+        this.nextInodeId  = 0;     // Genera ID para nuevos inodos
     }
 
-    // ----------------------------------------------------------
-    // init(totalMB, blockSizeKB)
-    // Inicializa el disco con los parámetros dados por el usuario.
-    // Calcula la cantidad de bloques, reserva espacio del sistema
-    // y crea el superbloque con todos los contadores.
-    // ----------------------------------------------------------
-    init(totalMB, blockSizeKB) {
-        const totalBytes     = totalMB * 1024 * 1024;
-        const blockSizeBytes = blockSizeKB * 1024;
+/* ----------------------------- Inicializacion del Disco -----------------------
+Inicializamos nuestro disco simulado con la informacion que nos dio el usuariario
+calculando el numero de bloques y espacio de sistema. A su vez, crea el superbloque con los contadores */
 
-        // Número total de bloques que caben en el disco
-        const totalBlocks = Math.floor(totalBytes / blockSizeBytes);
+    init(totalMB, blockSizeKB) {  //recibe el tamanio del disco, tamano del bloque
+        const totalBytes     = totalMB * 1024 * 1024; //convirtiendo a bytes
+        const blockSizeBytes = blockSizeKB * 1024; // convirtiendo a bytes
 
-        // Bloques reservados para estructuras del sistema (~5%, mínimo 3)
+      
+        const totalBlocks = Math.floor(totalBytes / blockSizeBytes); // calculando cuantos bloques caben en el disco
+ 
+        //Cantidad de bloques = tamanio total / tamanio de cada bloque
+
+ //---------------------------- Bloques de Sistema y Bloques de Datos -----------------------------   
         // Bloque 0: Superbloque | Bloque 1: Bitmap | Bloque 2+: Inodos
-        const systemBlocks = Math.max(3, Math.floor(totalBlocks * 0.05));
+        //Ya que no todos los bloques seran para archivos, se reserva una parte para el sistema 5% aprox.
+        const systemBlocks = Math.max(3, Math.floor(totalBlocks * 0.05));// Reservamos el 5% del disco para una estructura minima de 3 bloques
         const dataBlocks   = totalBlocks - systemBlocks;
 
-        // Máximo de inodos: 1 inodo por cada 4 bloques de datos (heurística EXT2)
+        // Máximo de inodos: 1 inodo por cada 4 bloques de datos 
         const maxInodes = Math.max(16, Math.floor(dataBlocks / 4));
 
-        // ── SUPERBLOQUE ──────────────────────────────────────
-        // Estructura que describe globalmente el sistema de archivos.
-        // EXT2 real usa este bloque siempre en el offset 1024 del disco.
+/* ---------------------- Super Bloque ------------------------------------
+contiene la informacion general sobre el file system, es como la ficha techica del disco: cuanto espacio hay y cuanto se utilizo ya*/
         this.superblock = {
             magic         : 'EXT-SIM-74',       // Número mágico de identificación
             totalBlocks   : totalBlocks,          // Total de bloques en disco
@@ -69,25 +54,26 @@ class SimulatedDisk {
             lastModified  : new Date().toISOString(),
         };
 
-        // ── BITMAP DE BLOQUES ─────────────────────────────────
-        // Array donde cada posición i corresponde al bloque i.
-        // 0 = bloque libre | 1 = bloque ocupado
-        // Los bloques del sistema (0..systemBlocks-1) siempre están marcados.
+/* ----------------------------- Bitmap ---------------------------------------
+cada posicion representa un bloque: 0 es un bloque libre y 1 es un bloque ocupado 
+Los bloques del sistema (0..systemBlocks-1) siempre están marcados.*/
         this.blockBitmap = new Array(totalBlocks).fill(0);
         for (let i = 0; i < systemBlocks; i++) {
             this.blockBitmap[i] = 1; // Bloque del sistema → siempre ocupado
         }
 
-        // ── BLOQUES FÍSICOS ───────────────────────────────────
-        // Cada elemento representa un bloque de almacenamiento.
-        // En EXT real sería un sector del disco; aquí es un objeto JS.
+/* -------------------------- Bloques Fisicos -----------------------------
+Representa un bloque de almacenamiento simulado mediante objetos de JS*/
+        //Creamos el bloque
         this.blocks = Array.from({ length: totalBlocks }, (_, i) => ({
-            id      : i,
-            data    : i < systemBlocks ? '[SISTEMA]' : null,
-            inodeId : null,   // null = bloque libre
+            id      : i, // numero de bloque
+            data    : i < systemBlocks ? '[SISTEMA]' : null, //que bloque de sistema y que inodo es, osea, que contiene
+            inodeId : null,   // inodeID es a que archivo pertence. null = bloque libre
         }));
 
-        // ── TABLA DE INODOS ───────────────────────────────────
+ /* ------------------   Tabla de Inodos ----------------------- 
+ El inodo es la estructura que continene informacion sobre un archivo o un directorio 
+ EL inodo sabe donde estan los bloques que pertenecen al archivo*/
         this.inodeTable  = [];
         this.nextInodeId = 0;
         this.initialized = true;
@@ -95,43 +81,40 @@ class SimulatedDisk {
         return this.superblock;
     }
 
-    // ----------------------------------------------------------
-    // allocateBlocks(count)
-    // Busca `count` bloques libres en el bitmap y los reserva.
-    // Algoritmo: First-Fit — toma los primeros bloques libres.
-    // Retorna array de índices, o [] si no hay espacio suficiente.
-    // ----------------------------------------------------------
-    allocateBlocks(count) {
-        if (count <= 0) return [];
-        if (this.superblock.freeBlocks < count) return [];
 
-        const allocated = [];
+/* ---------------- Allocate Blocks -------------------
+Busca los bloques o espacios libres y los reserva*/
+    //Usamos el algoritmo: First-Fit" toma los primeros bloques libres y los ocuapa
+    allocateBlocks(count) {  //Cuantos bloques ocupamos en el bitmap y los reserva
+        if (count <= 0) return []; //Si se pide 0, no hacemos nada
+        if (this.superblock.freeBlocks < count) return []; // verifica si existe suficiente espacio. Si esta libre (0), lo cambia a ocupado (1)
 
-        // Recorrer el bitmap a partir del primer bloque de datos
-        for (let i = this.superblock.systemBlocks; i < this.superblock.totalBlocks; i++) {
-            if (this.blockBitmap[i] === 0) {
-                // Marcar como ocupado en el bitmap
-                this.blockBitmap[i] = 1;
-                allocated.push(i);
-                if (allocated.length === count) break;
+        const allocated = []; //Crea un arreglo vacio para guardar los bloques
+
+        // Recorrer el bitmap a partir buscando bloques libres
+        for (let i = this.superblock.systemBlocks; i < this.superblock.totalBlocks; i++) { //
+            //let i = this.superblock.systemBlocks: no comenzamos desde el bloque 0 porque son los
+            //que estan reservados para el sistema
+
+            if (this.blockBitmap[i] === 0) { // Si el bloque esta libre
+                this.blockBitmap[i] = 1; // Marcar como ocupado en el bitmap: de 0 a 1
+                allocated.push(i); // Guaramos el bloque reservado agregando el numero del bloque al arreglo
+                if (allocated.length === count) break; 
+                // verifica si ya encontramos la cantidad (count) que ocupamos de bloques en el sistema.
+                // si es asi, se tenie el for con el Break
             }
         }
 
         // Actualizar contadores en el superbloque
         this.superblock.freeBlocks  -= allocated.length;
         this.superblock.usedBlocks  += allocated.length;
-        this.superblock.lastModified = new Date().toISOString();
+        this.superblock.lastModified = new Date().toISOString(); //Actualizamos la fecha de la modificacion
 
-        return allocated;
+        return allocated; // devolvemos lo que se reservo
     }
 
-    //Comprobando la rama que acabo de crear y validnado que si funcione 
-    //Explicacion de video .
-    // ----------------------------------------------------------
-    // freeBlocks(blockList)
-    // Libera los bloques indicados: los marca como 0 en el bitmap
-    // y limpia el contenido del bloque físico.
-    // ----------------------------------------------------------
+
+    // freeBlocks hace lo contrario a Allocate Blocks
     freeBlocks(blockList) {
         let freed = 0;
         for (const id of blockList) {
@@ -148,93 +131,79 @@ class SimulatedDisk {
         // Actualizar contadores en el superbloque
         this.superblock.freeBlocks  += freed;
         this.superblock.usedBlocks  -= freed;
-        this.superblock.lastModified = new Date().toISOString();
+        this.superblock.lastModified = new Date().toISOString();  //Actualizamos la fecha de la modificacion
     }
 
-    // ----------------------------------------------------------
-    // createInode({ name, type, size, blockList, parentDirId, content })
-    // Crea un nuevo inodo en la tabla y apunta los bloques físicos.
-    // En EXT2 real, el inodo almacena apuntadores directos (12),
-    // indirectos simples, dobles y triples. Aquí sólo usamos directos.
-    // ----------------------------------------------------------
-    createInode({ name, type, size, blockList, parentDirId, content = '' }) {
-        if (this.superblock.freeInodes === 0) {
+  /*------------------ Creando el Inodo ---------------------- */
+    createInode({ name, type, size, blockList, parentDirId, content = '' }) { // Crea un nuevo inodo
+        if (this.superblock.freeInodes === 0) { // Revisamos con el superblock si hay inodos disponibles 
             throw new Error('Tabla de inodos llena: no hay inodos disponibles');
         }
 
-        const inode = {
-            id          : this.nextInodeId++,       // Número de inodo (único)
-            name        : name,                      // Nombre del archivo/carpeta
-            type        : type,                      // 'file' | 'dir'
-            size        : size,                      // Tamaño en bytes
-            blocks      : [...blockList],            // Apuntadores directos a bloques
-            content     : content,                   // Contenido (simulado en memoria)
-            parentDirId : parentDirId,               // Referencia al directorio padre
-            permissions : type === 'dir' ? 'drwxr-xr-x' : '-rw-r--r--',
-            links       : type === 'dir' ? 2 : 1,   // Contador de hard links
-            uid         : 1000,                      // Usuario propietario (simulado)
-            gid         : 1000,                      // Grupo propietario (simulado)
-            createdAt   : new Date().toISOString(),
-            modifiedAt  : new Date().toISOString(),
-            accessedAt  : new Date().toISOString(),
+        const inode = { // construyendo el inodo con JS
+            id          : this.nextInodeId++,       // Número de inodo unico
+            name        : name,                      // nombre del archivo o carpeta
+            type        : type,                      // verificand si es archvio o directorio
+            size        : size,                      // Tamaño que ocupa en bytes
+            blocks      : [...blockList],            // Guarda el numero de bloques fisicos donde se guarda el archivo y crea una copia del arreglo
+            content     : content,                   // contenido del archivo
+            parentDirId : parentDirId,               // Directorio padre, dentro de que carpeta se guardo
+            permissions : type === 'dir' ? 'drwxr-xr-x' : '-rw-r--r--', // permisos si es directorio o archivo
+            //drwxr-xr-x   ->   imita los permisos de Linux/EXT2. Directorio d
+            //-rw-r--r--   ->   archivo -
+            links       : type === 'dir' ? 2 : 1,   // Contador de hard links, si es directorio 2, si es archivo 1 (sistema Unix)
+            uid         : 1000,                      // user id (simulado)
+            gid         : 1000,                      // grupo id (simulado)
+            //Fechas de crear, modificar y cuando se accedio
+            createdAt   : new Date().toISOString(),   
+            modifiedAt  : new Date().toISOString(),   
+            accessedAt  : new Date().toISOString(),   
         };
 
         // Registrar en cada bloque físico a qué inodo pertenece
         for (const blockId of blockList) {
-            this.blocks[blockId].inodeId = inode.id;
-            this.blocks[blockId].data    = `[Inodo #${inode.id}: ${name}]`;
+            this.blocks[blockId].inodeId = inode.id; // Registra a que inodo pertenece cada bloque 
+            this.blocks[blockId].data    = `[Inodo #${inode.id}: ${name}]`; // Guarda una representacion de que archivo ocupa ese bloque 
         }
 
-        this.inodeTable.push(inode);
-        this.superblock.freeInodes--;
+        this.inodeTable.push(inode); // Agregamos el inodo a la abla
+        this.superblock.freeInodes--; //actualizamos los contadores
         this.superblock.usedInodes++;
 
         return inode;
     }
 
-    // ----------------------------------------------------------
-    // deleteInode(inodeId)
-    // Elimina el inodo de la tabla y libera sus bloques físicos.
-    // ----------------------------------------------------------
+
+    // Delete Inodo, aqui eliminamos el inodo de la tabla y liberamos sus bloques físicos.
     deleteInode(inodeId) {
-        const idx = this.inodeTable.findIndex(n => n.id === inodeId);
-        if (idx === -1) return false;
+        const idx = this.inodeTable.findIndex(n => n.id === inodeId); // buscamos el inodo, su posicion en el arreglo
+        if (idx === -1) return false; // si no existe, devuelve -1
 
-        const inode = this.inodeTable[idx];
+        const inode = this.inodeTable[idx]; // Si se encuentra, devuelve el objeto completo
 
-        // Liberar bloques físicos apuntados por este inodo
-        this.freeBlocks(inode.blocks);
+        
+        this.freeBlocks(inode.blocks);// Liberaramos los bloques físicos apuntados por el inodo
 
-        // Remover el inodo de la tabla
-        this.inodeTable.splice(idx, 1);
-        this.superblock.freeInodes++;
+        this.inodeTable.splice(idx, 1); // Remuve el inodo de la tabla
+        this.superblock.freeInodes++; //actualiazamos apuntadores
         this.superblock.usedInodes--;
 
         return true;
     }
 
-    // ----------------------------------------------------------
-    // getInode(inodeId)  →  objeto inodo | null
-    // ----------------------------------------------------------
+    // Get Inode, buscamos los inodos
     getInode(inodeId) {
-        return this.inodeTable.find(n => n.id === inodeId) ?? null;
+        return this.inodeTable.find(n => n.id === inodeId) ?? null; //buscamos el inodo y devolvemos el objeto completo
     }
 
-    // ----------------------------------------------------------
-    // calcBlocksNeeded(sizeBytes)
-    // Calcula cuántos bloques se necesitan para almacenar N bytes.
-    // Siempre se usa al menos 1 bloque (incluso para archivos vacíos).
-    // ----------------------------------------------------------
+    //---------------------- CalcBlocksNeeded ------------------------------------
+    //Verificamos cuantos bloques necesitamos para guardar un archivo determinado
     calcBlocksNeeded(sizeBytes) {
-        if (sizeBytes <= 0) return 1;
-        return Math.ceil(sizeBytes / this.superblock.blockSize);
+        if (sizeBytes <= 0) return 1; //aunque el archivo este vacio siempre reservamos un bloque
+        return Math.ceil(sizeBytes / this.superblock.blockSize); //hacemos la conversion y redondea de ser necesario
     }
 
-    // ----------------------------------------------------------
-    // Persistencia: serialize / deserialize
-    // Convierte el estado completo del disco a JSON y viceversa,
-    // para poder guardarlo en localStorage del navegador.
-    // ----------------------------------------------------------
+    //convertimos todo el estado del disco en un texto [string JSON] para guardarlo
     serialize() {
         return JSON.stringify({
             initialized  : this.initialized,
@@ -242,10 +211,11 @@ class SimulatedDisk {
             blockBitmap  : this.blockBitmap,
             blocks       : this.blocks,
             inodeTable   : this.inodeTable,
-            nextInodeId  : this.nextInodeId,
+            nextInodeId  : this.nextInodeId, // para evitar generar ids duplicados al cerrar el disco
         });
     }
 
+    // convertimos un texto [JSON] a JavaScript
     deserialize(json) {
         const d = JSON.parse(json);
         this.initialized = d.initialized;
@@ -256,18 +226,17 @@ class SimulatedDisk {
         this.nextInodeId = d.nextInodeId;
     }
 
-    // ----------------------------------------------------------
-    // reset() — Borra todo el estado del disco
-    // ----------------------------------------------------------
+    //-------------------- Reset -----------------
+    //dejamos el disco como recien creado
     reset() {
-        this.initialized = false;
-        this.superblock  = null;
+        this.initialized = false; //el disco ya no esta inicializado
+        this.superblock  = null; // eliminamos la info del superbloque
         this.blockBitmap = [];
         this.blocks      = [];
         this.inodeTable  = [];
-        this.nextInodeId = 0;
+        this.nextInodeId = 0;  //reiniciamos el Id
     }
 }
 
-// ── Instancia global del disco (singleton) ───────────────────
+//Instancia global del disco simulado
 const disk = new SimulatedDisk();
